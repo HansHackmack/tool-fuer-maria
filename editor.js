@@ -10,6 +10,7 @@
 let savedRange      = null;   // gespeicherte Selection vor Modal-Öffnung
 let tableGridDims   = { rows: 0, cols: 0 };
 let imageCounter    = 0;      // hochzählende ID für Zoom-Bild-Modals
+let editingImageEl  = null;   // <img>-Element das gerade bearbeitet wird, sonst null
 
 
 /* ── DOM-Referenzen ─────────────────────────────────────────── */
@@ -179,8 +180,9 @@ function normalizeParagraphs() {
     }
   }
 
-  // 3. <div> → <p> (Kinder verschieben, nicht innerHTML kopieren)
-  for (const div of [...editor.querySelectorAll(':scope > div')]) {
+  // 3. Klassenlose <div> → <p> (vom Browser beim Enter erzeugt)
+  //    Divs mit Klasse (Bild-Container, Modals) bleiben unberührt
+  for (const div of [...editor.querySelectorAll(':scope > div:not([class])')]) {
     const p = document.createElement('p');
     while (div.firstChild) p.appendChild(div.firstChild);
     editor.replaceChild(p, div);
@@ -299,6 +301,14 @@ function closeModal(id) {
    Kopieren
    ================================================================ */
 
+document.getElementById('btn-clear').addEventListener('click', () => {
+  if (!confirm('Wirklich alles löschen?')) return;
+  editor.innerHTML = '<p><br></p>';
+  localStorage.removeItem('editor-content');
+  updateSource();
+  editor.focus();
+});
+
 document.getElementById('btn-copy').addEventListener('click', () => {
   const text = sourceCode.textContent;
   navigator.clipboard.writeText(text).then(() => {
@@ -317,14 +327,177 @@ document.getElementById('btn-copy').addEventListener('click', () => {
 editor.addEventListener('mouseup', saveSelection);
 editor.addEventListener('keyup',   saveSelection);
 
+// Heading-Buttons aktiv markieren wenn Cursor in Überschrift steht
+editor.addEventListener('keyup',   updateHeadingButtons);
+editor.addEventListener('mouseup', updateHeadingButtons);
+
+function updateHeadingButtons() {
+  const sel = window.getSelection();
+  let tag = '';
+  if (sel && sel.rangeCount > 0) {
+    let node = sel.getRangeAt(0).startContainer;
+    if (node.nodeType === Node.TEXT_NODE) node = node.parentNode;
+    const block = node.closest && node.closest('h1,h2,h3,h4');
+    if (block && editor.contains(block)) tag = block.tagName.toLowerCase();
+  }
+  document.querySelectorAll('.tb-heading').forEach(btn => {
+    btn.classList.toggle('tb-active', btn.dataset.tag === tag);
+  });
+}
+
+
+/* ================================================================
+   Einfügen aus Zwischenablage: Word-HTML bereinigen
+   ================================================================ */
+
+editor.addEventListener('paste', e => {
+  e.preventDefault();
+
+  const html  = e.clipboardData.getData('text/html');
+  const plain = e.clipboardData.getData('text/plain');
+
+  const cleanHTML = html ? cleanPastedHTML(html) : plainToHTML(plain);
+
+  // Leeren Absatz am Cursor ersetzen statt einfügen
+  const sel = window.getSelection();
+  if (sel && sel.rangeCount > 0 && sel.getRangeAt(0).collapsed) {
+    let node = sel.getRangeAt(0).startContainer;
+    if (node.nodeType === Node.TEXT_NODE) node = node.parentNode;
+    const block = node.closest('p,h1,h2,h3,h4');
+    if (block && editor.contains(block) && block.textContent.trim() === '') {
+      const range = document.createRange();
+      range.selectNode(block);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+  }
+  savedRange = sel.rangeCount > 0 ? sel.getRangeAt(0).cloneRange() : null;
+
+  replaceSelectionWithHTML(cleanHTML);
+  trimEditorEdges();
+});
+
+function trimEditorEdges() {
+  const isEmpty = node =>
+    node.nodeType === Node.ELEMENT_NODE &&
+    /^(p|h[1-6])$/i.test(node.tagName) &&
+    node.textContent.trim() === '' &&
+    !node.querySelector('img');
+
+  while (editor.firstChild && isEmpty(editor.firstChild))
+    editor.removeChild(editor.firstChild);
+  while (editor.lastChild && isEmpty(editor.lastChild))
+    editor.removeChild(editor.lastChild);
+  if (!editor.firstChild) editor.innerHTML = '<p><br></p>';
+
+  updateSource();
+  localStorage.setItem('editor-content', editor.innerHTML);
+}
+
+function cleanPastedHTML(html) {
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+  tmp.querySelectorAll('script, style').forEach(el => el.remove());
+
+  const lines = [];
+  const walker = document.createTreeWalker(
+    tmp,
+    NodeFilter.SHOW_ELEMENT,
+    { acceptNode: node =>
+        /^(p|li|h[1-6])$/i.test(node.tagName)
+          ? NodeFilter.FILTER_ACCEPT
+          : NodeFilter.FILTER_SKIP
+    }
+  );
+  let node;
+  while ((node = walker.nextNode())) {
+    const text = node.textContent.replace(/ /g, ' ').trim();
+    if (text) lines.push(`<p>${escText(text)}</p>`);
+  }
+
+  return lines.length ? lines.join('\n') : plainToHTML(tmp.textContent);
+}
+
+function plainToHTML(text) {
+  const lines = text.split(/\n\n+/).map(s => s.replace(/\n/g, ' ').trim()).filter(Boolean);
+  return lines.length
+    ? lines.map(t => `<p>${escText(t)}</p>`).join('\n')
+    : '<p><br></p>';
+}
+
+
+/* ================================================================
+   Überschriften
+   ================================================================ */
+
+function setBlockType(targetTag) {
+  restoreSelection();
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return;
+
+  let node = sel.getRangeAt(0).startContainer;
+  if (node.nodeType === Node.TEXT_NODE) node = node.parentNode;
+  const block = node.closest('p,h1,h2,h3,h4,h5,h6');
+  if (!block || !editor.contains(block)) return;
+
+  const newTag = block.tagName.toLowerCase() === targetTag ? 'p' : targetTag;
+  const newEl  = document.createElement(newTag);
+  while (block.firstChild) newEl.appendChild(block.firstChild);
+  block.parentNode.replaceChild(newEl, block);
+
+  // Cursor ans Ende des neuen Elements
+  const range = document.createRange();
+  range.selectNodeContents(newEl);
+  range.collapse(false);
+  sel.removeAllRanges();
+  sel.addRange(range);
+  saveSelection();
+
+  updateSource();
+  updateHeadingButtons();
+  localStorage.setItem('editor-content', editor.innerHTML);
+}
+
+document.querySelectorAll('.tb-heading').forEach(btn => {
+  btn.addEventListener('mousedown', e => {
+    e.preventDefault();
+    saveSelection();
+    setBlockType(btn.dataset.tag);
+  });
+});
+
 
 /* ================================================================
    Textformatierung: Fett / Kursiv / Durchgestrichen
    ================================================================ */
 
+/** Sucht nächsten Vorfahren-Span mit passendem Inline-Style. */
+function getFormattingSpan(styleProp, styleValue) {
+  if (!savedRange) return null;
+  let node = savedRange.commonAncestorContainer;
+  if (node.nodeType === Node.TEXT_NODE) node = node.parentNode;
+  while (node && node !== editor) {
+    if (node.tagName === 'SPAN' && node.style[styleProp] === styleValue) return node;
+    node = node.parentNode;
+  }
+  return null;
+}
+
+/** Hebt einen Span auf und setzt seinen Inhalt an dessen Stelle. */
+function unwrapSpan(span) {
+  const parent = span.parentNode;
+  while (span.firstChild) parent.insertBefore(span.firstChild, span);
+  parent.removeChild(span);
+  updateSource();
+  localStorage.setItem('editor-content', editor.innerHTML);
+  editor.focus();
+}
+
 document.getElementById('btn-bold').addEventListener('mousedown', e => {
   e.preventDefault();
   saveSelection();
+  const existing = getFormattingSpan('fontWeight', 'bold');
+  if (existing) { unwrapSpan(existing); return; }
   wrapSelection(() => {
     const span = document.createElement('span');
     span.style.fontWeight = 'bold';
@@ -335,6 +508,8 @@ document.getElementById('btn-bold').addEventListener('mousedown', e => {
 document.getElementById('btn-italic').addEventListener('mousedown', e => {
   e.preventDefault();
   saveSelection();
+  const existing = getFormattingSpan('fontStyle', 'italic');
+  if (existing) { unwrapSpan(existing); return; }
   wrapSelection(() => {
     const span = document.createElement('span');
     span.style.fontStyle = 'italic';
@@ -345,6 +520,8 @@ document.getElementById('btn-italic').addEventListener('mousedown', e => {
 document.getElementById('btn-strike').addEventListener('mousedown', e => {
   e.preventDefault();
   saveSelection();
+  const existing = getFormattingSpan('textDecoration', 'line-through');
+  if (existing) { unwrapSpan(existing); return; }
   wrapSelection(() => {
     const span = document.createElement('span');
     span.style.textDecoration = 'line-through';
@@ -357,6 +534,26 @@ document.getElementById('btn-strike').addEventListener('mousedown', e => {
    Klassen-Zuweisung
    ================================================================ */
 
+/**
+ * Gibt das Block-Element zurück, wenn die Selection dessen
+ * gesamten Inhalt umfasst — sonst null.
+ */
+function getFullySelectedBlock(range) {
+  if (!range || range.collapsed) return null;
+
+  let startNode = range.startContainer;
+  if (startNode.nodeType === Node.TEXT_NODE) startNode = startNode.parentNode;
+  const startBlock = startNode.closest('p,h1,h2,h3,h4,h5,h6,li');
+  if (!startBlock || !editor.contains(startBlock)) return null;
+
+  // Textvergleich: Ist der selektierte Text identisch mit dem Block-Inhalt?
+  // Das funktioniert unabhängig davon, wo Browser das Range-Ende genau setzen
+  // (z.B. offset 0 des Folgeelements bei Triple-Click).
+  const selectedText = range.toString().trim();
+  const blockText    = startBlock.textContent.trim();
+  return (blockText && selectedText === blockText) ? startBlock : null;
+}
+
 document.getElementById('btn-apply-class').addEventListener('mousedown', e => {
   e.preventDefault();
   saveSelection();
@@ -365,6 +562,17 @@ document.getElementById('btn-apply-class').addEventListener('mousedown', e => {
   const cls    = custom || select;
   if (!cls) return;
 
+  // Ist ein kompletter Block selektiert? → Klasse direkt ans Block-Element
+  const block = getFullySelectedBlock(savedRange);
+  if (block) {
+    cls.split(/\s+/).filter(Boolean).forEach(c => block.classList.add(c));
+    updateSource();
+    localStorage.setItem('editor-content', editor.innerHTML);
+    editor.focus();
+    return;
+  }
+
+  // Sonst: Selection in <span class="..."> einwickeln
   wrapSelection(() => {
     const span = document.createElement('span');
     span.className = cls;
@@ -384,27 +592,32 @@ document.getElementById('btn-remove-class').addEventListener('mousedown', e => {
   e.preventDefault();
   saveSelection();
 
-  const sel = window.getSelection();
-  if (!sel) return;
-
-  // Cursor-Position oder Selection auswerten
   let node = savedRange
     ? savedRange.commonAncestorContainer
-    : (sel.rangeCount > 0 ? sel.getRangeAt(0).commonAncestorContainer : null);
+    : (window.getSelection()?.rangeCount > 0 ? window.getSelection().getRangeAt(0).commonAncestorContainer : null);
   if (!node) return;
   if (node.nodeType === Node.TEXT_NODE) node = node.parentNode;
 
+  // 1. Span mit Klasse aufheben
   const span = node.closest('span[class]');
-  if (!span || !editor.contains(span)) return;
+  if (span && editor.contains(span)) {
+    const parent = span.parentNode;
+    while (span.firstChild) parent.insertBefore(span.firstChild, span);
+    parent.removeChild(span);
+    updateSource();
+    localStorage.setItem('editor-content', editor.innerHTML);
+    editor.focus();
+    return;
+  }
 
-  // Span aufheben: Kinder an dessen Stelle einsetzen
-  const parent = span.parentNode;
-  while (span.firstChild) parent.insertBefore(span.firstChild, span);
-  parent.removeChild(span);
-
-  updateSource();
-  localStorage.setItem('editor-content', editor.innerHTML);
-  editor.focus();
+  // 2. Klasse direkt vom Block-Element entfernen
+  const block = node.closest('p[class],h1[class],h2[class],h3[class],h4[class],li[class]');
+  if (block && editor.contains(block)) {
+    block.removeAttribute('class');
+    updateSource();
+    localStorage.setItem('editor-content', editor.innerHTML);
+    editor.focus();
+  }
 });
 
 
@@ -413,7 +626,10 @@ document.getElementById('btn-remove-class').addEventListener('mousedown', e => {
    ================================================================ */
 
 document.querySelectorAll('.modal-close').forEach(btn => {
-  btn.addEventListener('click', () => closeModal(btn.dataset.modal));
+  btn.addEventListener('click', () => {
+    if (btn.dataset.modal === 'modal-image') editingImageEl = null;
+    closeModal(btn.dataset.modal);
+  });
 });
 
 document.querySelectorAll('.modal-overlay').forEach(overlay => {
@@ -430,6 +646,7 @@ document.addEventListener('keydown', e => {
   document.querySelectorAll('.modal-overlay:not([hidden])').forEach(m => {
     m.setAttribute('hidden', '');
   });
+  editingImageEl = null;
   editor.focus();
 });
 
@@ -470,8 +687,73 @@ document.getElementById('btn-link-ok').addEventListener('click', () => {
    Bild-Modal
    ================================================================ */
 
+function buildImageHTML(src, alt, title, copyright, type) {
+  const ta = title ? ` title="${escAttr(title)}"` : '';
+  if (type === 'simple') {
+    return `<img src="${escAttr(src)}" alt="${escAttr(alt)}"${ta} class="w-100 rounded">\n` +
+           `<p class="text-muted">© ${escText(copyright)}</p>`;
+  }
+  imageCounter++;
+  const N = imageCounter;
+  return (
+    `<div class="nl-imagebox-left">\n` +
+    `  <a href="#imgzoom${N}" data-toggle="modal">\n` +
+    `    <img src="${escAttr(src)}" alt="${escAttr(alt)}"${ta} style="max-width:100%;">\n` +
+    `  </a>\n` +
+    `  <p class="bu">\n` +
+    `    © ${escText(copyright)}; für Großansicht bitte anklicken\n` +
+    `  </p>\n` +
+    `</div>\n` +
+    `<div class="modal fade" id="imgzoom${N}" style="display: none;" aria-hidden="true">\n` +
+    `  <div class="modal-dialog modal-lg nl-imagebox-modal">\n` +
+    `    <div class="modal-content">\n` +
+    `      <div class="modal-header">\n` +
+    `        <button aria-hidden="true" data-dismiss="modal" class="close" type="button">x</button>\n` +
+    `      </div>\n` +
+    `      <div class="modal-body">\n` +
+    `        <div class="row">\n` +
+    `          <img src="${escAttr(src)}" alt="${escAttr(alt)}"${ta} style="max-width:100%;">\n` +
+    `          <p class="bu">© ${escText(copyright)}</p>\n` +
+    `        </div>\n` +
+    `      </div>\n` +
+    `    </div>\n` +
+    `  </div>\n` +
+    `</div>`
+  );
+}
+
+// Bild im Editor anklicken → Modal mit vorhandenen Werten öffnen
+editor.addEventListener('click', e => {
+  if (e.target.tagName !== 'IMG') return;
+  if (e.target.closest('.modal.fade')) return; // Zoom-Modal-Bild ignorieren
+  editingImageEl = e.target;
+
+  const isZoom = !!editingImageEl.closest('.nl-imagebox-left');
+  document.getElementById('img-src').value         = editingImageEl.getAttribute('src') || '';
+  document.getElementById('img-alt').value         = editingImageEl.getAttribute('alt') || '';
+  document.getElementById('img-title-field').value = editingImageEl.getAttribute('title') || '';
+
+  let copyright = '';
+  if (isZoom) {
+    const bu = editingImageEl.closest('.nl-imagebox-left').querySelector('.bu');
+    if (bu) copyright = bu.textContent
+      .replace(/;\s*für Großansicht bitte anklicken\s*$/i, '')
+      .replace(/^©\s*/, '').trim();
+  } else {
+    const next = editingImageEl.nextElementSibling;
+    if (next && next.classList.contains('text-muted'))
+      copyright = next.textContent.replace(/^©\s*/, '').trim();
+  }
+  document.getElementById('img-copyright').value = copyright;
+  document.querySelector(`input[name="img-type"][value="${isZoom ? 'zoom' : 'simple'}"]`).checked = true;
+
+  openModal('modal-image');
+  setTimeout(() => document.getElementById('img-src').focus(), 40);
+});
+
 document.getElementById('btn-image').addEventListener('mousedown', e => {
   e.preventDefault();
+  editingImageEl = null;
   saveSelection();
   document.getElementById('img-src').value         = '';
   document.getElementById('img-alt').value         = '';
@@ -482,7 +764,10 @@ document.getElementById('btn-image').addEventListener('mousedown', e => {
   setTimeout(() => document.getElementById('img-src').focus(), 40);
 });
 
-document.getElementById('btn-image-cancel').addEventListener('click', () => closeModal('modal-image'));
+document.getElementById('btn-image-cancel').addEventListener('click', () => {
+  editingImageEl = null;
+  closeModal('modal-image');
+});
 
 document.getElementById('btn-image-ok').addEventListener('click', () => {
   const src       = document.getElementById('img-src').value.trim();
@@ -493,44 +778,43 @@ document.getElementById('btn-image-ok').addEventListener('click', () => {
   const copyright = document.getElementById('img-copyright').value.trim();
   const type      = document.querySelector('input[name="img-type"]:checked').value;
 
-  const titleAttr = title ? ` title="${escAttr(title)}"` : '';
-  let html;
+  if (editingImageEl) {
+    // ── Bestehendes Bild ersetzen ──────────────────────────────
+    const isZoom = !!editingImageEl.closest('.nl-imagebox-left');
 
-  if (type === 'simple') {
-    html =
-      `<img src="${escAttr(src)}" alt="${escAttr(alt)}"${titleAttr} class="w-100 rounded">\n` +
-      `<p class="text-muted">© ${escText(copyright)}</p>`;
+    // Alle zu entfernenden Elemente sammeln
+    const toRemove = [];
+    if (isZoom) {
+      const container = editingImageEl.closest('.nl-imagebox-left');
+      toRemove.push(container);
+      const href = container.querySelector('a[href^="#imgzoom"]')?.getAttribute('href');
+      if (href) {
+        const oldModal = editor.querySelector(href);
+        if (oldModal) toRemove.push(oldModal);
+      }
+    } else {
+      toRemove.push(editingImageEl);
+      const next = editingImageEl.nextElementSibling;
+      if (next && next.classList.contains('text-muted')) toRemove.push(next);
+    }
+
+    // Neues HTML vor dem ersten zu entfernenden Element einfügen
+    const anchor = toRemove[0];
+    const parent = anchor.parentNode;
+    const tmp = document.createElement('div');
+    tmp.innerHTML = buildImageHTML(src, alt, title, copyright, type);
+    while (tmp.firstChild) parent.insertBefore(tmp.firstChild, anchor);
+    toRemove.forEach(el => el.parentNode?.removeChild(el));
+
+    editingImageEl = null;
+    closeModal('modal-image');
+    updateSource();
+    localStorage.setItem('editor-content', editor.innerHTML);
   } else {
-    imageCounter++;
-    const N = imageCounter;
-    html =
-      `<div class="nl-imagebox-left">\n` +
-      `  <a href="#imgzoom${N}" data-toggle="modal">\n` +
-      `    <img src="${escAttr(src)}" alt="${escAttr(alt)}"${titleAttr} style="max-width:100%;">\n` +
-      `  </a>\n` +
-      `  <p class="bu">\n` +
-      `    © ${escText(copyright)}; für Großansicht bitte anklicken\n` +
-      `  </p>\n` +
-      `</div>\n` +
-      `<div class="modal fade" id="imgzoom${N}" style="display: none;" aria-hidden="true">\n` +
-      `  <div class="modal-dialog modal-lg nl-imagebox-modal">\n` +
-      `    <div class="modal-content">\n` +
-      `      <div class="modal-header">\n` +
-      `        <button aria-hidden="true" data-dismiss="modal" class="close" type="button">x</button>\n` +
-      `      </div>\n` +
-      `      <div class="modal-body">\n` +
-      `        <div class="row">\n` +
-      `          <img src="${escAttr(src)}" alt="${escAttr(alt)}"${titleAttr} style="max-width:100%;">\n` +
-      `          <p class="bu">© ${escText(copyright)}</p>\n` +
-      `        </div>\n` +
-      `      </div>\n` +
-      `    </div>\n` +
-      `  </div>\n` +
-      `</div>`;
+    // ── Neues Bild einfügen ────────────────────────────────────
+    closeModal('modal-image');
+    replaceSelectionWithHTML(buildImageHTML(src, alt, title, copyright, type));
   }
-
-  closeModal('modal-image');
-  replaceSelectionWithHTML(html);
 });
 
 

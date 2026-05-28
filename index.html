@@ -30,6 +30,16 @@
 
           <div id="toolbar">
 
+            <!-- Überschriften -->
+            <div class="toolbar-group">
+              <button id="btn-h1" class="tb-heading" data-tag="h1" title="Überschrift H1" type="button">H1</button>
+              <button id="btn-h2" class="tb-heading" data-tag="h2" title="Überschrift H2" type="button">H2</button>
+              <button id="btn-h3" class="tb-heading" data-tag="h3" title="Überschrift H3" type="button">H3</button>
+              <button id="btn-h4" class="tb-heading" data-tag="h4" title="Überschrift H4" type="button">H4</button>
+            </div>
+
+            <span class="toolbar-sep"></span>
+
             <!-- Textformatierung -->
             <div class="toolbar-group">
               <button id="btn-bold"   class="tb-fmt tb-bold"   title="Fett (Inline-CSS)"           type="button">F</button>
@@ -107,6 +117,7 @@
         <div class="source-panel">
           <div class="source-toolbar">
             <button id="btn-copy" type="button">In Zwischenablage kopieren</button>
+            <button id="btn-clear" type="button">Alles löschen</button>
           </div>
           <pre id="source-view"
                aria-label="HTML-Quellcode (schreibgeschützt)"

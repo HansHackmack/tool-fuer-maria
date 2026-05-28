@@ -143,6 +143,13 @@ body {
 .tb-italic { font-style: italic; }
 .tb-strike { text-decoration: line-through; }
 
+.tb-heading          { font-weight: 700; color: #444; min-width: 28px; }
+.tb-heading[data-tag="h1"] { font-size: 14px; }
+.tb-heading[data-tag="h2"] { font-size: 13px; }
+.tb-heading[data-tag="h3"] { font-size: 12px; }
+.tb-heading[data-tag="h4"] { font-size: 11px; }
+.tb-heading.tb-active { background: #dceeff; border-color: #4a90d9; color: #1a5fa8; }
+
 #toolbar select {
   padding: 3px 6px;
   height: 28px;
@@ -491,17 +498,25 @@ body {
 .btn-secondary:focus-visible { outline: 2px solid #4a90d9; outline-offset: 2px; }
 
 
-/* ── Klassen-Visualisierung im Editor ───────────────────────── */
+/* ── Bilder im Editor ────────────────────────────────────────── */
 
-#editor span[class] {
-  position: relative;
-  background: rgba(74, 144, 217, 0.13);
-  border-bottom: 1.5px dashed #4a90d9;
-  border-radius: 2px;
+#editor img {
+  cursor: pointer;
+  max-width: 100%;
+  display: block;
 }
 
+#editor img:hover {
+  outline: 2px solid #4a90d9;
+  outline-offset: 2px;
+}
+
+
+/* ── Formatierungs- und Klassen-Visualisierung im Editor ──────── */
+
+/* Gemeinsame Tooltip-Basis */
+#editor span[style]:hover::after,
 #editor span[class]:hover::after {
-  content: attr(class);
   position: absolute;
   bottom: calc(100% + 5px);
   left: 0;
@@ -516,9 +531,56 @@ body {
   z-index: 50;
 }
 
+#editor span[style*="font-weight: bold"] {
+  position: relative;
+  background: rgba(230, 126, 34, 0.13);
+  border-bottom: 1.5px dashed #e67e22;
+  border-radius: 2px;
+}
+#editor span[style*="font-weight: bold"]:hover::after {
+  content: "Fett";
+}
+
+#editor span[style*="font-style: italic"] {
+  position: relative;
+  background: rgba(14, 159, 110, 0.13);
+  border-bottom: 1.5px dashed #0e9f6e;
+  border-radius: 2px;
+}
+#editor span[style*="font-style: italic"]:hover::after {
+  content: "Kursiv";
+}
+
+#editor span[style*="line-through"] {
+  position: relative;
+  background: rgba(124, 58, 237, 0.12);
+  border-bottom: 1.5px dashed #7c3aed;
+  border-radius: 2px;
+}
+#editor span[style*="line-through"]:hover::after {
+  content: "Durchgestrichen";
+}
+
+#editor span[class] {
+  position: relative;
+  background: rgba(74, 144, 217, 0.13);
+  border-bottom: 1.5px dashed #4a90d9;
+  border-radius: 2px;
+}
+#editor span[class]:hover::after {
+  content: attr(class);
+}
+
 #btn-remove-class {
   color: #b33;
   border-color: #f0c0c0;
 }
 
 #btn-remove-class:hover { background: #fff0f0; border-color: #b33; }
+
+#btn-clear {
+  color: #b33;
+  border-color: #f0c0c0;
+}
+
+#btn-clear:hover { background: #fff0f0; border-color: #b33; }
