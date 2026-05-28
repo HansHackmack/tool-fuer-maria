@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Redaktions-Webtool</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1/themes/prism-okaidia.min.css">
+  <link rel="stylesheet" href="editor.css">
+</head>
+<body>
+
+<div id="app">
+
+  <header id="app-header">
+    <h1>Redaktions-Webtool</h1>
+  </header>
+
+  <main id="app-main">
+
+    <!-- ═══════════════════════════════════════════════
+         Werkzeugblock 1: WYSIWYG HTML-Editor
+    ══════════════════════════════════════════════════ -->
+    <section id="block-editor" class="tool-block">
+      <h2 class="block-title">HTML-Editor</h2>
+
+      <div class="editor-layout">
+
+        <!-- ── Linke Spalte: WYSIWYG-Editor ──────── -->
+        <div class="editor-panel">
+
+          <div id="toolbar">
+
+            <!-- Textformatierung -->
+            <div class="toolbar-group">
+              <button id="btn-bold"   class="tb-fmt tb-bold"   title="Fett (Inline-CSS)"           type="button">F</button>
+              <button id="btn-italic" class="tb-fmt tb-italic" title="Kursiv (Inline-CSS)"          type="button">K</button>
+              <button id="btn-strike" class="tb-fmt tb-strike" title="Durchgestrichen (Inline-CSS)" type="button">D</button>
+            </div>
+
+            <span class="toolbar-sep"></span>
+
+            <!-- Klassen-Zuweisung -->
+            <div class="toolbar-group">
+              <select id="class-select" title="Vordefinierte Klasse auswählen">
+                <option value="">&#8211; Klasse &#8211;</option>
+                <option>text-fett</option>
+                <option>text-kursiv</option>
+                <option>text-danger</option>
+                <option>text-success</option>
+                <option>zitat</option>
+                <option>bg-primary</option>
+                <option>bg-secondary</option>
+                <option>bg-success</option>
+                <option>bg-warning</option>
+                <option>bg-danger</option>
+                <option value="btn btn-default">btn btn-default</option>
+                <option value="btn btn-primary">btn btn-primary</option>
+                <option value="btn btn-danger">btn btn-danger</option>
+                <option value="badge badge-success">badge badge-success</option>
+                <option value="badge badge-warning">badge badge-warning</option>
+                <option value="badge badge-danger">badge badge-danger</option>
+              </select>
+              <input id="class-custom" type="text" placeholder="Eigene Klasse(n)" title="Eigene CSS-Klassen (Leerzeichen = mehrere Klassen)">
+              <button id="btn-apply-class" type="button">Anwenden</button>
+              <button id="btn-remove-class" title="Klasse vom markierten Text / Cursor-Position entfernen" type="button">&#10005; Klasse</button>
+            </div>
+
+            <span class="toolbar-sep"></span>
+
+            <!-- Einfügen -->
+            <div class="toolbar-group">
+              <button id="btn-link"  title="Link einfügen" type="button">Link</button>
+              <button id="btn-image" title="Bild einfügen" type="button">Bild</button>
+            </div>
+
+            <span class="toolbar-sep"></span>
+
+            <!-- Listen -->
+            <div class="toolbar-group">
+              <button id="btn-ul" title="Ungeordnete Liste einfügen" type="button">UL</button>
+              <button id="btn-ol" title="Geordnete Liste einfügen"   type="button">OL</button>
+            </div>
+
+            <span class="toolbar-sep"></span>
+
+            <!-- Tabelle mit Grid-Picker -->
+            <div class="toolbar-group" id="table-picker-anchor">
+              <button id="btn-table" title="Tabelle einfügen" type="button">Tabelle</button>
+              <div id="table-grid-picker" class="table-grid-picker" hidden>
+                <div id="table-grid" class="table-grid"></div>
+                <div id="table-grid-label" class="table-grid-label">0 &times; 0</div>
+              </div>
+            </div>
+
+          </div><!-- /#toolbar -->
+
+          <div id="editor"
+               contenteditable="true"
+               spellcheck="true"
+               role="textbox"
+               aria-multiline="true"
+               aria-label="Editor-Bereich"></div>
+
+        </div><!-- /.editor-panel -->
+
+        <!-- ── Rechte Spalte: Quellcode-Ansicht ───── -->
+        <div class="source-panel">
+          <div class="source-toolbar">
+            <button id="btn-copy" type="button">In Zwischenablage kopieren</button>
+          </div>
+          <pre id="source-view"
+               aria-label="HTML-Quellcode (schreibgeschützt)"
+               aria-readonly="true"><code id="source-code" class="language-html"></code></pre>
+        </div>
+
+      </div><!-- /.editor-layout -->
+    </section>
+
+    <!-- ── Weitere Werkzeugblöcke hier ergänzen ───── -->
+
+  </main>
+</div><!-- /#app -->
+
+
+<!-- ════════════════════════════════════════════
+     Modal: Link einfügen
+═════════════════════════════════════════════ -->
+<div id="modal-link" class="modal-overlay" hidden
+     role="dialog" aria-modal="true" aria-labelledby="modal-link-title">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3 id="modal-link-title">Link einfügen</h3>
+      <button class="modal-close" data-modal="modal-link" type="button" aria-label="Schließen">&times;</button>
+    </div>
+    <div class="modal-body">
+      <label class="field-label">
+        URL <span class="req">*</span>
+        <input id="link-href" type="url" placeholder="https://…" autocomplete="url">
+      </label>
+      <label class="field-label">
+        Title
+        <input id="link-title" type="text">
+      </label>
+      <label class="field-label">
+        Target
+        <select id="link-target">
+          <option value="_blank">_blank</option>
+          <option value="_self">_self</option>
+          <option value="_parent">_parent</option>
+          <option value="_top">_top</option>
+        </select>
+      </label>
+      <p class="field-note">rel="nofollow" wird automatisch gesetzt.</p>
+    </div>
+    <div class="modal-footer">
+      <button id="btn-link-cancel" class="btn-secondary" type="button">Abbrechen</button>
+      <button id="btn-link-ok"     class="btn-primary"   type="button">Einfügen</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════
+     Modal: Bild einfügen
+═════════════════════════════════════════════ -->
+<div id="modal-image" class="modal-overlay" hidden
+     role="dialog" aria-modal="true" aria-labelledby="modal-image-title">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3 id="modal-image-title">Bild einfügen</h3>
+      <button class="modal-close" data-modal="modal-image" type="button" aria-label="Schließen">&times;</button>
+    </div>
+    <div class="modal-body">
+      <fieldset class="field-group">
+        <legend>Bildtyp</legend>
+        <label class="radio-label">
+          <input type="radio" name="img-type" value="simple" checked>
+          Einfaches Bild
+        </label>
+        <label class="radio-label">
+          <input type="radio" name="img-type" value="zoom">
+          Zoomfähiges Bild mit Modal
+        </label>
+      </fieldset>
+      <label class="field-label">
+        Bild-URL (src) <span class="req">*</span>
+        <input id="img-src" type="url" placeholder="https://…" autocomplete="url">
+      </label>
+      <label class="field-label">
+        Alternativtext (alt)
+        <input id="img-alt" type="text">
+      </label>
+      <label class="field-label">
+        Titel (title)
+        <input id="img-title-field" type="text">
+      </label>
+      <label class="field-label">
+        Copyright-Text
+        <input id="img-copyright" type="text" placeholder="Fotograf / Quelle">
+      </label>
+    </div>
+    <div class="modal-footer">
+      <button id="btn-image-cancel" class="btn-secondary" type="button">Abbrechen</button>
+      <button id="btn-image-ok"     class="btn-primary"   type="button">Einfügen</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════
+     Modal: Tabellenstil
+═════════════════════════════════════════════ -->
+<div id="modal-table" class="modal-overlay" hidden
+     role="dialog" aria-modal="true" aria-labelledby="modal-table-title">
+  <div class="modal-box modal-box--narrow">
+    <div class="modal-header">
+      <h3 id="modal-table-title">Tabellenstil wählen</h3>
+      <button class="modal-close" data-modal="modal-table" type="button" aria-label="Schließen">&times;</button>
+    </div>
+    <div class="modal-body">
+      <fieldset class="field-group">
+        <legend>Stil</legend>
+        <label class="radio-label">
+          <input type="radio" name="table-style" value="striped" checked>
+          <span>
+            <strong>tabelle-striped</strong>
+            <small>Erste Zeile = thead, letzte = tfoot</small>
+          </span>
+        </label>
+        <label class="radio-label">
+          <input type="radio" name="table-style" value="rahmen">
+          <span>
+            <strong>tabelle-rahmen</strong>
+            <small>Erste Zeile mit tabelle-rahmen-kopf</small>
+          </span>
+        </label>
+      </fieldset>
+    </div>
+    <div class="modal-footer">
+      <button id="btn-table-cancel" class="btn-secondary" type="button">Abbrechen</button>
+      <button id="btn-table-ok"     class="btn-primary"   type="button">Einfügen</button>
+    </div>
+  </div>
+</div>
+
+
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1/prism.min.js"></script>
+<script src="editor.js"></script>
+</body>
+</html>

@@ -1,0 +1,524 @@
+/* ================================================================
+   Redaktions-Webtool — editor.css
+   ================================================================ */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  background: #efefef;
+  color: #1a1a1a;
+}
+
+
+/* ── App-Shell ──────────────────────────────────────────────── */
+
+#app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+#app-header {
+  background: #1e2a3a;
+  color: #fff;
+  padding: 12px 24px;
+  flex-shrink: 0;
+}
+
+#app-header h1 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: .04em;
+}
+
+#app-main {
+  flex: 1;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+
+/* ── Werkzeugblock ──────────────────────────────────────────── */
+
+.tool-block {
+  background: #fff;
+  border: 1px solid #d4d4d4;
+  border-radius: 6px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.block-title {
+  margin: 0;
+  padding: 9px 16px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: #555;
+  background: #f5f5f5;
+  border-bottom: 1px solid #d4d4d4;
+}
+
+
+/* ── Editor-Layout (zwei Spalten) ────────────────────────────── */
+
+.editor-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-height: 540px;
+  flex: 1;
+}
+
+.editor-panel {
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid #d4d4d4;
+  overflow: hidden;
+}
+
+.source-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #fafafa;
+}
+
+
+/* ── Toolbar ─────────────────────────────────────────────────── */
+
+#toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 7px 10px;
+  background: #f5f5f5;
+  border-bottom: 1px solid #d4d4d4;
+  flex-shrink: 0;
+}
+
+.toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  position: relative;
+}
+
+.toolbar-sep {
+  display: block;
+  width: 1px;
+  height: 22px;
+  background: #d0d0d0;
+  margin: 0 3px;
+  flex-shrink: 0;
+}
+
+#toolbar button {
+  padding: 3px 9px;
+  height: 28px;
+  border: 1px solid #c0c0c0;
+  border-radius: 3px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  white-space: nowrap;
+  color: #1a1a1a;
+  transition: background .1s, border-color .1s;
+}
+
+#toolbar button:hover  { background: #e8e8e8; border-color: #a0a0a0; }
+#toolbar button:active { background: #d8d8d8; }
+
+.tb-bold   { font-weight: bold; }
+.tb-italic { font-style: italic; }
+.tb-strike { text-decoration: line-through; }
+
+#toolbar select {
+  padding: 3px 6px;
+  height: 28px;
+  border: 1px solid #c0c0c0;
+  border-radius: 3px;
+  background: #fff;
+  font-size: 13px;
+  cursor: pointer;
+  max-width: 165px;
+}
+
+#toolbar input[type="text"] {
+  padding: 3px 7px;
+  height: 28px;
+  border: 1px solid #c0c0c0;
+  border-radius: 3px;
+  font-size: 13px;
+  width: 125px;
+}
+
+#toolbar select:focus,
+#toolbar input:focus,
+#toolbar button:focus-visible {
+  outline: 2px solid #4a90d9;
+  outline-offset: 1px;
+}
+
+
+/* ── Editor-Inhaltsbereich ───────────────────────────────────── */
+
+#editor {
+  flex: 1;
+  padding: 16px 18px;
+  outline: none;
+  line-height: 1.7;
+  overflow-y: auto;
+  font-size: 14px;
+}
+
+#editor:empty::before {
+  content: "Text hier eingeben …";
+  color: #bbb;
+  pointer-events: none;
+}
+
+#editor table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 6px 0;
+}
+
+#editor td,
+#editor th {
+  border: 1px solid #ccc;
+  padding: 5px 8px;
+  min-width: 48px;
+  vertical-align: top;
+}
+
+#editor th { background: #f0f0f0; font-weight: 600; }
+
+#editor ul,
+#editor ol {
+  padding-left: 24px;
+  margin: 4px 0;
+}
+
+
+/* ── Quellcode-Panel ─────────────────────────────────────────── */
+
+.source-toolbar {
+  padding: 7px 10px;
+  background: #f5f5f5;
+  border-bottom: 1px solid #d4d4d4;
+  flex-shrink: 0;
+}
+
+.source-toolbar button {
+  padding: 3px 12px;
+  height: 28px;
+  border: 1px solid #c0c0c0;
+  border-radius: 3px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background .1s;
+}
+
+.source-toolbar button:hover  { background: #e8e8e8; }
+.source-toolbar button:active { background: #d8d8d8; }
+.source-toolbar button:focus-visible { outline: 2px solid #4a90d9; outline-offset: 1px; }
+
+#source-view {
+  flex: 1;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  background: #272822; /* Okaidia-Hintergrund */
+  border-radius: 0;
+}
+
+#source-view code {
+  display: block;
+  padding: 14px 16px !important;
+  font-family: "Consolas", "Fira Code", "Monaco", monospace !important;
+  font-size: 12px !important;
+  line-height: 1.6 !important;
+  white-space: pre-wrap !important;
+  word-break: break-all;
+  min-height: 100%;
+  box-sizing: border-box;
+  background: transparent !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+
+/* ── Tabellen-Grid-Picker ────────────────────────────────────── */
+
+.table-grid-picker {
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 0;
+  z-index: 300;
+  background: #fff;
+  border: 1px solid #c0c0c0;
+  border-radius: 5px;
+  padding: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,.18);
+}
+
+.table-grid {
+  display: grid;
+  grid-template-columns: repeat(10, 18px);
+  gap: 2px;
+}
+
+.tg-cell {
+  width: 18px;
+  height: 18px;
+  border: 1px solid #ccc;
+  border-radius: 1px;
+  cursor: pointer;
+  background: #f8f8f8;
+  transition: background .07s, border-color .07s;
+}
+
+.tg-cell.tg-active {
+  background: #4a90d9;
+  border-color: #2870b9;
+}
+
+.table-grid-label {
+  margin-top: 7px;
+  text-align: center;
+  font-size: 12px;
+  color: #555;
+  min-height: 16px;
+}
+
+
+/* ── Modals ──────────────────────────────────────────────────── */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, .45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-overlay[hidden] { display: none; }
+
+.modal-box {
+  background: #fff;
+  border-radius: 7px;
+  box-shadow: 0 10px 40px rgba(0,0,0,.28);
+  width: 440px;
+  max-width: 95vw;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.modal-box--narrow { width: 360px; }
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px 13px;
+  border-bottom: 1px solid #e4e4e4;
+  flex-shrink: 0;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  color: #888;
+  padding: 0 2px;
+  transition: color .1s;
+}
+
+.modal-close:hover { color: #222; }
+
+.modal-body {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  overflow-y: auto;
+}
+
+.field-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #333;
+}
+
+.field-label input[type="text"],
+.field-label input[type="url"],
+.field-label select {
+  padding: 6px 9px;
+  border: 1px solid #c0c0c0;
+  border-radius: 4px;
+  font-size: 13px;
+  font-family: inherit;
+  width: 100%;
+  transition: border-color .1s;
+}
+
+.field-label input:focus,
+.field-label select:focus {
+  outline: none;
+  border-color: #4a90d9;
+  box-shadow: 0 0 0 3px rgba(74,144,217,.15);
+}
+
+.field-group {
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 10px 12px 12px;
+  margin: 0;
+}
+
+.field-group legend {
+  font-size: 12px;
+  font-weight: 600;
+  color: #555;
+  padding: 0 4px;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+
+.radio-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: normal;
+  cursor: pointer;
+  margin-top: 8px;
+}
+
+.radio-label input[type="radio"] {
+  margin-top: 2px;
+  flex-shrink: 0;
+  accent-color: #4a90d9;
+}
+
+.radio-label span {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.radio-label small {
+  color: #888;
+  font-size: 11px;
+}
+
+.field-note {
+  margin: 0;
+  font-size: 12px;
+  color: #888;
+}
+
+.req {
+  color: #c0392b;
+  font-weight: 700;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 18px;
+  border-top: 1px solid #e4e4e4;
+  flex-shrink: 0;
+}
+
+.btn-primary {
+  padding: 6px 20px;
+  background: #2c7be5;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background .1s;
+}
+
+.btn-primary:hover  { background: #1a68d1; }
+.btn-primary:active { background: #1558b0; }
+.btn-primary:focus-visible { outline: 2px solid #4a90d9; outline-offset: 2px; }
+
+.btn-secondary {
+  padding: 6px 20px;
+  background: #ebebeb;
+  color: #333;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background .1s;
+}
+
+.btn-secondary:hover  { background: #d8d8d8; }
+.btn-secondary:active { background: #c8c8c8; }
+.btn-secondary:focus-visible { outline: 2px solid #4a90d9; outline-offset: 2px; }
+
+
+/* ── Klassen-Visualisierung im Editor ───────────────────────── */
+
+#editor span[class] {
+  position: relative;
+  background: rgba(74, 144, 217, 0.13);
+  border-bottom: 1.5px dashed #4a90d9;
+  border-radius: 2px;
+}
+
+#editor span[class]:hover::after {
+  content: attr(class);
+  position: absolute;
+  bottom: calc(100% + 5px);
+  left: 0;
+  background: #1e2a3a;
+  color: #e8e8e8;
+  font-size: 10px;
+  font-family: "Consolas", "Monaco", monospace;
+  padding: 2px 7px;
+  border-radius: 3px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 50;
+}
+
+#btn-remove-class {
+  color: #b33;
+  border-color: #f0c0c0;
+}
+
+#btn-remove-class:hover { background: #fff0f0; border-color: #b33; }
