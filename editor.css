@@ -584,3 +584,17 @@ body {
 }
 
 #btn-clear:hover { background: #fff0f0; border-color: #b33; }
+
+
+/* ── Versionsnummer ──────────────────────────────────────────── */
+
+#version-badge {
+  position: fixed;
+  bottom: 10px;
+  right: 14px;
+  font-size: 11px;
+  color: #aaa;
+  pointer-events: none;
+  user-select: none;
+  z-index: 9999;
+}
