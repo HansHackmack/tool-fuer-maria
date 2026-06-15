@@ -7,20 +7,26 @@
 
 /* ── Globaler Zustand ────────────────────────────────────────── */
 
-let savedRange      = null;   // gespeicherte Selection vor Modal-Öffnung
-let tableGridDims   = { rows: 0, cols: 0 };
-let imageCounter    = 0;      // hochzählende ID für Zoom-Bild-Modals
-let editingImageEl  = null;   // <img>-Element das gerade bearbeitet wird, sonst null
+let savedRange        = null;
+let tableGridDims     = { rows: 0, cols: 0 };
+let imageCounter      = 0;
+let editingImageEl    = null;
+let syncingFromSource = false;
+let cm                = null;
+let currentHoveredTable = null;
+let currentHoveredSpan  = null;
+let hideOverlayTimer    = null;
 
 
 /* ── DOM-Referenzen ─────────────────────────────────────────── */
 
-const editor         = document.getElementById('editor');
-const sourceView     = document.getElementById('source-view');
-const sourceCode     = document.getElementById('source-code');
+const editor          = document.getElementById('editor');
+const sourceView      = document.getElementById('source-view');
 const tableGridPicker = document.getElementById('table-grid-picker');
 const tableGrid       = document.getElementById('table-grid');
 const tableGridLabel  = document.getElementById('table-grid-label');
+const tableDeleteBtn  = document.getElementById('table-delete-btn');
+const spanRemoveBtn   = document.getElementById('span-remove-btn');
 
 
 /* ================================================================
@@ -142,12 +148,13 @@ function replaceSelectionWithHTML(html) {
    ================================================================ */
 
 function updateSource() {
+  if (!cm) return;
   const pretty = prettifyHTML(editor.innerHTML);
-  sourceCode.textContent = pretty;
-  if (window.Prism) Prism.highlightElement(sourceCode);
+  cm.setValue(pretty);
 }
 
 editor.addEventListener('input', () => {
+  if (syncingFromSource) return;
   normalizeParagraphs();
   updateSource();
   localStorage.setItem('editor-content', editor.innerHTML);
@@ -310,7 +317,7 @@ document.getElementById('btn-clear').addEventListener('click', () => {
 });
 
 document.getElementById('btn-copy').addEventListener('click', () => {
-  const text = sourceCode.textContent;
+  const text = cm ? cm.getValue() : '';
   navigator.clipboard.writeText(text).then(() => {
     const btn = document.getElementById('btn-copy');
     const prev = btn.textContent;
@@ -819,19 +826,195 @@ document.getElementById('btn-image-ok').addEventListener('click', () => {
 
 
 /* ================================================================
+   Hover-Overlays: Tabelle löschen / Klassen-Span entfernen
+   ================================================================ */
+
+function positionOverlay(btn, targetEl) {
+  const panelRect  = editor.parentElement.getBoundingClientRect();
+  const targetRect = targetEl.getBoundingClientRect();
+  // Button liegt innerhalb des Elements (oben rechts, leicht eingerückt)
+  btn.style.top  = (targetRect.top  - panelRect.top  + 3) + 'px';
+  btn.style.left = (targetRect.right - panelRect.left - 19) + 'px';
+  btn.hidden = false;
+}
+
+function scheduleHideOverlays() {
+  hideOverlayTimer = setTimeout(() => {
+    tableDeleteBtn.hidden = true;
+    spanRemoveBtn.hidden  = true;
+    currentHoveredTable   = null;
+    currentHoveredSpan    = null;
+  }, 2000);
+}
+
+function cancelHideOverlays() { clearTimeout(hideOverlayTimer); }
+
+editor.addEventListener('mouseover', e => {
+  cancelHideOverlays();
+
+  const table = e.target.closest('table');
+  const span  = e.target.closest('span[class]');
+  const block = e.target.closest('p[class],h1[class],h2[class],h3[class],h4[class],li[class]');
+
+  if (table && editor.contains(table)) {
+    currentHoveredTable = table;
+    positionOverlay(tableDeleteBtn, table);
+    spanRemoveBtn.hidden = true;
+  } else if (span && editor.contains(span)) {
+    currentHoveredSpan = span;
+    positionOverlay(spanRemoveBtn, span);
+    tableDeleteBtn.hidden = true;
+  } else if (block && editor.contains(block)) {
+    currentHoveredSpan = block;
+    positionOverlay(spanRemoveBtn, block);
+    tableDeleteBtn.hidden = true;
+  } else {
+    scheduleHideOverlays();
+  }
+});
+
+editor.addEventListener('mouseleave', scheduleHideOverlays);
+
+[tableDeleteBtn, spanRemoveBtn].forEach(btn => {
+  btn.addEventListener('mouseenter', cancelHideOverlays);
+  btn.addEventListener('mouseleave', scheduleHideOverlays);
+});
+
+tableDeleteBtn.addEventListener('click', () => {
+  if (!currentHoveredTable) return;
+  currentHoveredTable.remove();
+  tableDeleteBtn.hidden = true;
+  currentHoveredTable = null;
+  updateSource();
+});
+
+spanRemoveBtn.addEventListener('click', () => {
+  if (!currentHoveredSpan) return;
+  const el = currentHoveredSpan;
+  if (el.tagName === 'SPAN') {
+    const parent = el.parentNode;
+    while (el.firstChild) parent.insertBefore(el.firstChild, el);
+    parent.removeChild(el);
+  } else {
+    el.removeAttribute('class');
+  }
+  spanRemoveBtn.hidden = true;
+  currentHoveredSpan = null;
+  updateSource();
+});
+
+
+/* ================================================================
+   Typografie
+   ================================================================ */
+
+function convertTypography(text) {
+  // ... → …
+  text = text.replace(/\.\.\./g, '…');
+  // " - " und " -- " → " – " (nur zwischen Leerzeichen, nicht in 4-5 o.ä.)
+  text = text.replace(/ -+ /g, ' – ');
+  // Anführungszeichen: öffnendes " nach Leerzeichen/Satzanfang/Klammer → „
+  text = text.replace(/(^|[\s([{–—])"(?=\S)/g, '$1„');
+  // verbleibende " → schließendes "
+  text = text.replace(/"/g, '“');
+  return text;
+}
+
+function applyTypographyToRoot(root) {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let node;
+  while ((node = walker.nextNode())) {
+    node.textContent = convertTypography(node.textContent);
+  }
+}
+
+function applyTypographyInRange(range) {
+  const ancestor = range.commonAncestorContainer;
+  const root = ancestor.nodeType === Node.TEXT_NODE ? ancestor.parentNode : ancestor;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let node;
+  while ((node = walker.nextNode())) {
+    if (range.intersectsNode(node)) {
+      node.textContent = convertTypography(node.textContent);
+    }
+  }
+}
+
+document.getElementById('btn-typography').addEventListener('mousedown', e => {
+  e.preventDefault();
+  saveSelection();
+
+  if (savedRange && !savedRange.collapsed && isSelectionInEditor(savedRange)) {
+    applyTypographyInRange(savedRange);
+  } else {
+    applyTypographyToRoot(editor);
+  }
+
+  updateSource();
+  localStorage.setItem('editor-content', editor.innerHTML);
+  editor.focus();
+});
+
+
+/* ================================================================
    Listen
    ================================================================ */
+
+function extractListItems(html) {
+  const BLOCK = new Set(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'div', 'li', 'blockquote']);
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+
+  const hasBlocks = [...tmp.childNodes].some(
+    n => n.nodeType === Node.ELEMENT_NODE && BLOCK.has(n.tagName.toLowerCase())
+  );
+
+  if (hasBlocks) {
+    const items = [];
+    for (const node of tmp.childNodes) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        const t = node.textContent.trim();
+        if (t) items.push(t);
+      } else if (node.nodeType === Node.ELEMENT_NODE && BLOCK.has(node.tagName.toLowerCase())) {
+        const inner = node.innerHTML.trim();
+        const byBR = inner.split(/<br\s*\/?>/i).map(s => s.trim()).filter(Boolean);
+        if (byBR.length > 1) {
+          items.push(...byBR);
+        } else if (inner) {
+          items.push(inner);
+        }
+      } else if (node.nodeType === Node.ELEMENT_NODE) {
+        if (node.textContent.trim()) items.push(node.outerHTML);
+      }
+    }
+    return items.length ? items : [''];
+  } else {
+    return tmp.innerHTML.split(/<br\s*\/?>/i).map(s => s.trim()).filter(Boolean);
+  }
+}
+
+function buildListFromSelection(tag) {
+  if (!savedRange || savedRange.collapsed) {
+    return `<${tag}>\n  <li>Listenpunkt</li>\n</${tag}>`;
+  }
+  const items = extractListItems(getSelectionHTML());
+  if (!items.length || (items.length === 1 && items[0] === '')) {
+    return `<${tag}>\n  <li>Listenpunkt</li>\n</${tag}>`;
+  }
+  const lis = items.map(c => `  <li>${c}</li>`).join('\n');
+  return `<${tag}>\n${lis}\n</${tag}>`;
+}
 
 document.getElementById('btn-ul').addEventListener('mousedown', e => {
   e.preventDefault();
   saveSelection();
-  replaceSelectionWithHTML('<ul>\n  <li>Listenpunkt</li>\n</ul>');
+  replaceSelectionWithHTML(buildListFromSelection('ul'));
 });
 
 document.getElementById('btn-ol').addEventListener('mousedown', e => {
   e.preventDefault();
   saveSelection();
-  replaceSelectionWithHTML('<ol>\n  <li>Listenpunkt</li>\n</ol>');
+  replaceSelectionWithHTML(buildListFromSelection('ol'));
 });
 
 /** Tab = Einrücken, Enter = Klassen-Span verlassen, Shift+Tab = Ausrücken */
@@ -982,9 +1165,10 @@ document.getElementById('btn-table-cancel').addEventListener('click', () => clos
 document.getElementById('btn-table-ok').addEventListener('click', () => {
   const style = document.querySelector('input[name="table-style"]:checked').value;
   const { rows, cols } = tableGridDims;
-  const html = style === 'striped'
-    ? buildStripedTable(rows, cols)
-    : buildRahmenTable(rows, cols);
+  const html = style === 'striped'     ? buildStripedTable(rows, cols)
+             : style === 'rahmen'     ? buildRahmenTable(rows, cols)
+             : style === 'borderless' ? buildSimpleTable(rows, cols, 'table table-borderless')
+             :                         buildSimpleTable(rows, cols, 'table table-sm');
   closeModal('modal-table');
   replaceSelectionWithHTML(html);
 });
@@ -1010,6 +1194,23 @@ function buildStripedTable(rows, cols) {
     html += `  <tfoot>\n${row(cols, td)}\n  </tfoot>\n`;
   }
 
+  return html + `</table>`;
+}
+
+function buildSimpleTable(rows, cols, cls) {
+  const td = () => `      <td>&nbsp;</td>`;
+  const th = () => `      <th>&nbsp;</th>`;
+  const row = (fn) => `    <tr>\n${Array(cols).fill(0).map(fn).join('\n')}\n    </tr>`;
+
+  let html = `<table class="${cls}">\n`;
+  if (rows === 1) {
+    html += `  <tbody>\n${row(td)}\n  </tbody>\n`;
+  } else {
+    html += `  <thead>\n${row(th)}\n  </thead>\n`;
+    html += `  <tbody>\n`;
+    for (let r = 1; r < rows; r++) html += `${row(td)}\n`;
+    html += `  </tbody>\n`;
+  }
   return html + `</table>`;
 }
 
@@ -1050,4 +1251,38 @@ _initRange.collapse(false);
 window.getSelection().removeAllRanges();
 window.getSelection().addRange(_initRange);
 
+// CodeMirror initialisieren
+cm = CodeMirror(sourceView, {
+  mode: 'xml',
+  theme: 'monokai',
+  lineNumbers: true,
+  lineWrapping: true,
+  tabSize: 2,
+  indentWithTabs: false,
+  autofocus: false,
+});
+
+// source → editor Sync (mit Debounce, 300ms)
+let _sourceUpdateTimer = null;
+cm.on('change', (instance, changeObj) => {
+  if (changeObj.origin === 'setValue') return;
+  clearTimeout(_sourceUpdateTimer);
+  _sourceUpdateTimer = setTimeout(() => {
+    syncingFromSource = true;
+    editor.innerHTML = cm.getValue();
+    localStorage.setItem('editor-content', editor.innerHTML);
+    syncingFromSource = false;
+  }, 300);
+});
+
 updateSource();
+
+// localStorage-Autosave: alle 100ms speichern wenn sich Inhalt geändert hat
+let _lastSavedContent = editor.innerHTML;
+setInterval(() => {
+  const current = editor.innerHTML;
+  if (current !== _lastSavedContent) {
+    _lastSavedContent = current;
+    localStorage.setItem('editor-content', current);
+  }
+}, 100);

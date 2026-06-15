@@ -82,8 +82,25 @@ body {
   display: flex;
   flex-direction: column;
   border-right: 1px solid #d4d4d4;
-  overflow: hidden;
+  overflow: visible;
+  position: relative;
 }
+
+.el-overlay-btn {
+  position: absolute;
+  z-index: 100;
+  width: 16px;
+  height: 16px;
+  background: #c0392b;
+  color: #fff;
+  border-radius: 2px;
+  font-size: 11px;
+  line-height: 16px;
+  text-align: center;
+  cursor: pointer;
+  user-select: none;
+}
+.el-overlay-btn:hover { background: #96281b; }
 
 .source-panel {
   display: flex;
@@ -138,6 +155,8 @@ body {
 
 #toolbar button:hover  { background: #e8e8e8; border-color: #a0a0a0; }
 #toolbar button:active { background: #d8d8d8; }
+
+#toolbar button svg { display: block; }
 
 .tb-bold   { font-weight: bold; }
 .tb-italic { font-style: italic; }
@@ -244,26 +263,20 @@ body {
 
 #source-view {
   flex: 1;
-  margin: 0;
-  padding: 0;
-  overflow-y: auto;
-  background: #272822; /* Okaidia-Hintergrund */
+  min-height: 0;
+  overflow: hidden;
+}
+
+#source-view .CodeMirror {
+  height: 100%;
+  font-family: "Consolas", "Fira Code", "Monaco", monospace;
+  font-size: 12px;
+  line-height: 1.6;
   border-radius: 0;
 }
 
-#source-view code {
-  display: block;
-  padding: 14px 16px !important;
-  font-family: "Consolas", "Fira Code", "Monaco", monospace !important;
-  font-size: 12px !important;
-  line-height: 1.6 !important;
-  white-space: pre-wrap !important;
-  word-break: break-all;
-  min-height: 100%;
-  box-sizing: border-box;
-  background: transparent !important;
-  border-radius: 0 !important;
-  box-shadow: none !important;
+#source-view .CodeMirror-scroll {
+  height: 100%;
 }
 
 
@@ -516,7 +529,13 @@ body {
 
 /* Gemeinsame Tooltip-Basis */
 #editor span[style]:hover::after,
-#editor span[class]:hover::after {
+#editor span[class]:hover::after,
+#editor p[class]:hover::after,
+#editor h1[class]:hover::after,
+#editor h2[class]:hover::after,
+#editor h3[class]:hover::after,
+#editor h4[class]:hover::after,
+#editor li[class]:hover::after {
   position: absolute;
   bottom: calc(100% + 5px);
   left: 0;
@@ -529,6 +548,26 @@ body {
   white-space: nowrap;
   pointer-events: none;
   z-index: 50;
+}
+
+/* Block-Elemente mit Klasse: blauer linker Balken + Tooltip */
+#editor p[class],
+#editor h1[class],
+#editor h2[class],
+#editor h3[class],
+#editor h4[class],
+#editor li[class] {
+  position: relative;
+  background: rgba(74, 144, 217, 0.13);
+}
+
+#editor p[class]:hover::after,
+#editor h1[class]:hover::after,
+#editor h2[class]:hover::after,
+#editor h3[class]:hover::after,
+#editor h4[class]:hover::after,
+#editor li[class]:hover::after {
+  content: attr(class);
 }
 
 #editor span[style*="font-weight: bold"] {
