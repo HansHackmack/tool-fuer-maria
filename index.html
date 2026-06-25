@@ -82,6 +82,7 @@
             <div class="toolbar-group">
               <button id="btn-link"  title="Link einfügen" type="button">Link</button>
               <button id="btn-image" title="Bild einfügen" type="button">Bild</button>
+              <button id="btn-eval"  title="{eval $ad} nach aktuellem Block einfügen" type="button">{eval $ad}</button>
             </div>
 
             <span class="toolbar-sep"></span>
@@ -158,7 +159,7 @@
   </main>
 </div><!-- /#app -->
 
-<div id="version-badge">v1.05.161</div>
+<div id="version-badge">v1.06.161</div>
 
 <!-- ════════════════════════════════════════════
      Modal: Link einfügen
@@ -279,6 +280,49 @@
     <div class="modal-footer">
       <button id="btn-table-cancel" class="btn-secondary" type="button">Abbrechen</button>
       <button id="btn-table-ok"     class="btn-primary"   type="button">Einfügen</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════
+     Modal: Changelog
+═════════════════════════════════════════════ -->
+<div id="modal-changelog" class="modal-overlay" hidden
+     role="dialog" aria-modal="true" aria-labelledby="modal-changelog-title">
+  <div class="modal-box modal-box--narrow">
+    <div class="modal-header">
+      <h3 id="modal-changelog-title">Changelog</h3>
+      <button class="modal-close" data-modal="modal-changelog" type="button" aria-label="Schließen">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="changelog">
+        <div>
+          <h4 class="cl-version">v1.06.161</h4>
+          <ul class="cl-list">
+            <li>Kontextsensitive Toolbar: Buttons werden disabled wenn sie keinen Effekt hätten</li>
+            <li>Einfaches Bild wird nicht mehr in &lt;p&gt; eingeschlossen</li>
+            <li>Trailing &lt;br&gt; erscheinen nicht mehr im Quellcode-Output</li>
+            <li>{eval $ad}-Button: fügt Template-Tag nach aktuellem Block ein, nicht editierbar, per Hover-× löschbar</li>
+          </ul>
+        </div>
+        <div>
+          <h4 class="cl-version">v1.05.161</h4>
+          <ul class="cl-list">
+            <li>Bidirektionaler Quellcode-Editor (CodeMirror)</li>
+            <li>Listen aus Selektion erzeugen</li>
+            <li>Hover-Overlays zum Löschen von Tabellen und Klassen-Spans</li>
+            <li>Typografie-Button</li>
+          </ul>
+        </div>
+        <div>
+          <h4 class="cl-version">v1.00.161</h4>
+          <ul class="cl-list">
+            <li>Versionsnummer, Klassen-Fix, Clear-All-Button</li>
+            <li>WYSIWYG HTML-Editor mit Live-Quellcode-Ansicht</li>
+          </ul>
+        </div>
+      </div>
     </div>
   </div>
 </div>

@@ -196,6 +196,14 @@ body {
   outline-offset: 1px;
 }
 
+#toolbar button:disabled,
+#toolbar select:disabled,
+#toolbar input[type="text"]:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 
 /* ── Editor-Inhaltsbereich ───────────────────────────────────── */
 
@@ -625,6 +633,22 @@ body {
 #btn-clear:hover { background: #fff0f0; border-color: #b33; }
 
 
+/* ── Eval-Tag im Editor ──────────────────────────────────────── */
+
+#editor div.eval-tag {
+  font-family: "Consolas", "Monaco", monospace;
+  font-size: 12px;
+  color: #0891b2;
+  background: rgba(8, 145, 178, 0.08);
+  border-left: 3px solid #0891b2;
+  padding: 2px 8px;
+  margin: 4px 0;
+  border-radius: 2px;
+  user-select: none;
+  cursor: default;
+}
+
+
 /* ── Versionsnummer ──────────────────────────────────────────── */
 
 #version-badge {
@@ -633,7 +657,37 @@ body {
   right: 14px;
   font-size: 11px;
   color: #aaa;
-  pointer-events: none;
   user-select: none;
   z-index: 9999;
+  cursor: pointer;
+  transition: color .15s;
+}
+#version-badge:hover { color: #777; }
+
+
+/* ── Changelog-Overlay ───────────────────────────────────────── */
+
+.changelog {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.cl-version {
+  margin: 0 0 5px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #1e2a3a;
+  letter-spacing: .03em;
+}
+
+.cl-list {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: #444;
+  line-height: 1.5;
 }

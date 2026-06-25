@@ -38,6 +38,7 @@ function saveSelection() {
   if (sel && sel.rangeCount > 0) {
     savedRange = sel.getRangeAt(0).cloneRange();
   }
+  updateToolbarState();
 }
 
 function restoreSelection() {
@@ -244,6 +245,11 @@ function prettifyHTML(html) {
 
     const tag = node.tagName.toLowerCase();
 
+    // eval-tag: kein Wrapper im Output, nur Rohtext
+    if (tag === 'div' && node.classList.contains('eval-tag')) {
+      return `${pad}${node.textContent}\n`;
+    }
+
     if (VOID.has(tag)) return `${pad}${makeOpenTag(node)}\n`;
 
     if (!BLOCK.has(tag)) {
@@ -257,8 +263,8 @@ function prettifyHTML(html) {
     );
 
     if (!hasBlockChild) {
-      // Nur Inline-Inhalt → einzeilig
-      const inner = node.innerHTML.trim();
+      // Nur Inline-Inhalt → einzeilig; trailing <br> (Browser-Platzhalter) weglassen
+      const inner = node.innerHTML.trim().replace(/<br\s*\/?>\s*$/i, '').trim();
       return inner
         ? `${pad}${makeOpenTag(node)}${inner}</${tag}>\n`
         : `${pad}${makeOpenTag(node)}</${tag}>\n`;
@@ -337,6 +343,26 @@ editor.addEventListener('keyup',   saveSelection);
 // Heading-Buttons aktiv markieren wenn Cursor in Überschrift steht
 editor.addEventListener('keyup',   updateHeadingButtons);
 editor.addEventListener('mouseup', updateHeadingButtons);
+
+// Toolbar-Buttons kontextsensitiv en-/disablen
+document.addEventListener('selectionchange', updateToolbarState);
+
+function updateToolbarState() {
+  const sel = window.getSelection();
+  const inEditor = sel && sel.rangeCount > 0
+    && editor.contains(sel.getRangeAt(0).commonAncestorContainer);
+  const hasSelection = inEditor && !sel.getRangeAt(0).collapsed;
+
+  ['btn-bold','btn-italic','btn-strike','btn-link','btn-apply-class'].forEach(id => {
+    document.getElementById(id).disabled = !hasSelection;
+  });
+  document.getElementById('class-select').disabled = !hasSelection;
+  document.getElementById('class-custom').disabled = !hasSelection;
+
+  ['btn-image','btn-eval','btn-table'].forEach(id => {
+    document.getElementById(id).disabled = !!hasSelection;
+  });
+}
 
 function updateHeadingButtons() {
   const sel = window.getSelection();
@@ -691,6 +717,62 @@ document.getElementById('btn-link-ok').addEventListener('click', () => {
 
 
 /* ================================================================
+   Block-Level-Einfügungen
+   ================================================================ */
+
+/** Fügt HTML immer NACH dem direkten Editor-Kind ein, das den Cursor enthält. */
+function insertAfterCurrentBlock(html) {
+  editor.focus();
+
+  let insertRef = null;
+  if (savedRange && isSelectionInEditor(savedRange)) {
+    let node = savedRange.commonAncestorContainer;
+    if (node.nodeType === Node.TEXT_NODE) node = node.parentNode;
+    while (node && node.parentNode !== editor) node = node.parentNode;
+    if (node && node !== editor) insertRef = node.nextSibling;
+  }
+
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+  while (tmp.firstChild) editor.insertBefore(tmp.firstChild, insertRef);
+
+  updateSource();
+  localStorage.setItem('editor-content', editor.innerHTML);
+}
+
+function insertAtBlockLevel(html) {
+  editor.focus();
+
+  let block = null;
+  if (savedRange && isSelectionInEditor(savedRange)) {
+    let node = savedRange.commonAncestorContainer;
+    if (node.nodeType === Node.TEXT_NODE) node = node.parentNode;
+    block = node.closest('p,h1,h2,h3,h4,li');
+    if (block && !editor.contains(block)) block = null;
+  }
+
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+
+  if (block) {
+    const isEmpty = block.textContent.trim() === '' && !block.querySelector('img');
+    if (isEmpty) {
+      while (tmp.firstChild) block.parentNode.insertBefore(tmp.firstChild, block);
+      block.parentNode.removeChild(block);
+    } else {
+      const ref = block.nextSibling;
+      while (tmp.firstChild) block.parentNode.insertBefore(tmp.firstChild, ref);
+    }
+  } else {
+    while (tmp.firstChild) editor.appendChild(tmp.firstChild);
+  }
+
+  updateSource();
+  localStorage.setItem('editor-content', editor.innerHTML);
+}
+
+
+/* ================================================================
    Bild-Modal
    ================================================================ */
 
@@ -820,7 +902,12 @@ document.getElementById('btn-image-ok').addEventListener('click', () => {
   } else {
     // ── Neues Bild einfügen ────────────────────────────────────
     closeModal('modal-image');
-    replaceSelectionWithHTML(buildImageHTML(src, alt, title, copyright, type));
+    const imgHTML = buildImageHTML(src, alt, title, copyright, type);
+    if (type === 'simple') {
+      insertAtBlockLevel(imgHTML);
+    } else {
+      replaceSelectionWithHTML(imgHTML);
+    }
   }
 });
 
@@ -852,9 +939,10 @@ function cancelHideOverlays() { clearTimeout(hideOverlayTimer); }
 editor.addEventListener('mouseover', e => {
   cancelHideOverlays();
 
-  const table = e.target.closest('table');
-  const span  = e.target.closest('span[class]');
-  const block = e.target.closest('p[class],h1[class],h2[class],h3[class],h4[class],li[class]');
+  const table   = e.target.closest('table');
+  const span    = e.target.closest('span[class]');
+  const evalTag = e.target.closest('div.eval-tag');
+  const block   = e.target.closest('p[class],h1[class],h2[class],h3[class],h4[class],li[class]');
 
   if (table && editor.contains(table)) {
     currentHoveredTable = table;
@@ -863,6 +951,10 @@ editor.addEventListener('mouseover', e => {
   } else if (span && editor.contains(span)) {
     currentHoveredSpan = span;
     positionOverlay(spanRemoveBtn, span);
+    tableDeleteBtn.hidden = true;
+  } else if (evalTag && editor.contains(evalTag)) {
+    currentHoveredSpan = evalTag;
+    positionOverlay(spanRemoveBtn, evalTag);
     tableDeleteBtn.hidden = true;
   } else if (block && editor.contains(block)) {
     currentHoveredSpan = block;
@@ -895,6 +987,8 @@ spanRemoveBtn.addEventListener('click', () => {
     const parent = el.parentNode;
     while (el.firstChild) parent.insertBefore(el.firstChild, el);
     parent.removeChild(el);
+  } else if (el.tagName === 'DIV' && el.classList.contains('eval-tag')) {
+    el.parentNode.removeChild(el);
   } else {
     el.removeAttribute('class');
   }
@@ -1228,6 +1322,64 @@ function buildRahmenTable(rows, cols) {
 
 
 /* ================================================================
+   Changelog
+   ================================================================ */
+
+document.getElementById('version-badge').addEventListener('click', () => {
+  openModal('modal-changelog');
+});
+
+
+/* ================================================================
+   Eval-Tag einfügen
+   ================================================================ */
+
+document.getElementById('btn-eval').addEventListener('mousedown', e => {
+  e.preventDefault();
+  saveSelection();
+  editor.focus();
+
+  // Direktes Kind des Editors ermitteln, das den Cursor enthält
+  let insertRef = null;
+  if (savedRange && isSelectionInEditor(savedRange)) {
+    let node = savedRange.commonAncestorContainer;
+    if (node.nodeType === Node.TEXT_NODE) node = node.parentNode;
+    while (node && node.parentNode !== editor) node = node.parentNode;
+    if (node && node !== editor) insertRef = node.nextSibling;
+  }
+
+  const evalDiv = document.createElement('div');
+  evalDiv.className = 'eval-tag';
+  evalDiv.setAttribute('contenteditable', 'false');
+  evalDiv.textContent = '{eval $ad}';
+  editor.insertBefore(evalDiv, insertRef);
+
+  // Sicherstellen, dass danach ein editierbarer Absatz folgt
+  const after = evalDiv.nextSibling;
+  let focusTarget;
+  if (!after || after.getAttribute?.('contenteditable') === 'false') {
+    focusTarget = document.createElement('p');
+    focusTarget.innerHTML = '<br>';
+    editor.insertBefore(focusTarget, evalDiv.nextSibling);
+  } else {
+    focusTarget = after;
+  }
+
+  // Cursor an den Anfang des folgenden Absatzes setzen
+  const range = document.createRange();
+  range.setStart(focusTarget, 0);
+  range.collapse(true);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+  saveSelection();
+
+  updateSource();
+  localStorage.setItem('editor-content', editor.innerHTML);
+});
+
+
+/* ================================================================
    Initialisierung
    ================================================================ */
 
@@ -1276,6 +1428,7 @@ cm.on('change', (instance, changeObj) => {
 });
 
 updateSource();
+updateToolbarState();
 
 // localStorage-Autosave: alle 100ms speichern wenn sich Inhalt geändert hat
 let _lastSavedContent = editor.innerHTML;
