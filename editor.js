@@ -444,7 +444,7 @@ function cleanPastedHTML(html) {
   );
   let node;
   while ((node = walker.nextNode())) {
-    const text = node.textContent.replace(/ /g, ' ').trim();
+    const text = node.textContent.replace(/ /g, ' ').replace(/\s+/g, ' ').trim();
     if (text) lines.push(`<p>${escText(text)}</p>`);
   }
 
