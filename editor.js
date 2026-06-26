@@ -844,7 +844,7 @@ document.getElementById('btn-image').addEventListener('mousedown', e => {
   e.preventDefault();
   editingImageEl = null;
   saveSelection();
-  document.getElementById('img-src').value         = '';
+  document.getElementById('img-src').value         = 'https://static.dashoefer.de/relaunch/images/pressemitteilungen/';
   document.getElementById('img-alt').value         = '';
   document.getElementById('img-title-field').value = '';
   document.getElementById('img-copyright').value   = '';
